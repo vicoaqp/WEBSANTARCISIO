@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Pensiones (3ºB)</title>
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, Timestamp, orderBy } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k", // 🚨 Reemplaza con tu API Key REAL
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const loadingMessageDiv = document.getElementById('loadingMessage');
+        const pensionsBody = document.getElementById('pensionsBody');
+        const statusMessageDiv = document.getElementById('statusMessage');
+
+        const ESTADOS_PENSION = ['PENDIENTE', 'PAGADO', 'VENCIDO', 'ANULADO'];
+
+        /**
+         * Muestra un mensaje en el área de mensajes global.
+         */
+        function showGlobalMessage(message, isError = false) {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `message ${isError ? 'error' : 'success'}`;
+            statusMessageDiv.style.display = 'block';
+            
+            // Ocultar después de 5 segundos
+            setTimeout(() => {
+                statusMessageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        /**
+         * Actualiza el estado de una pensión en Firestore.
+         */
+        async function updatePensionStatus(pensionId, newStatus) {
+            const selectElement = document.querySelector(`select[data-id="${pensionId}"]`);
+            if (selectElement) selectElement.disabled = true;
+
+            try {
+                const pensionRef = doc(db, 'pensionesalu', pensionId);
+                await updateDoc(pensionRef, {
+                    estado: newStatus,
+                    // Si se marca como PAGADO, podrías querer registrar la fecha de pago
+                    ...(newStatus === 'PAGADO' && { fechaPago: Timestamp.now() })
+                });
+
+                showGlobalMessage(`Estado de la pensión (ID: ${pensionId.substring(0, 5)}...) actualizado a ${newStatus}.`, false);
+
+            } catch (error) {
+                console.error("Error al actualizar estado:", error);
+                showGlobalMessage(`Error al actualizar estado: ${error.message}`, true);
+            } finally {
+                if (selectElement) selectElement.disabled = false;
+            }
+        }
+        
+        /**
+         * Formatea un Timestamp de Firestore a una fecha legible.
+         */
+        function formatDate(timestamp) {
+            if (!timestamp || !timestamp.toDate) return 'N/A';
+            const date = timestamp.toDate();
+            // Formato DD/MM/YYYY
+            return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        /**
+         * Carga los alumnos, luego sus pensiones y las renderiza.
+         */
+        async function loadStudentsAndPensions() {
+            loadingMessageDiv.style.display = 'block';
+            pensionsBody.innerHTML = ''; 
+
+            try {
+                // 1. Obtener los estudiantes de 3ºB y mapear DNI a Nombre
+                const studentsColRef = collection(db, 'students');
+                const qStudents = query(
+                    studentsColRef,
+                    where('grado', '==', '3'),
+                    where('seccion', '==', 'B')
+                );
+                
+                const studentsSnapshot = await getDocs(qStudents); 
+
+                if (studentsSnapshot.empty) {
+                    loadingMessageDiv.textContent = 'No se encontraron alumnos en 3ºB.';
+                    return;
+                }
+
+                const dniToNameMap = {};
+                const studentDnis = [];
+
+                studentsSnapshot.docs.forEach(docData => {
+                    const student = docData.data();
+                    dniToNameMap[student.idEstudiante] = `${student.nombres} ${student.apellidos}`;
+                    studentDnis.push(student.idEstudiante);
+                });
+
+                if (studentDnis.length === 0) {
+                    loadingMessageDiv.textContent = 'No se encontraron DNIs de alumnos.';
+                    return;
+                }
+
+                // 2. Consultar las pensiones por lotes (manejar limitación 'in' de 10)
+                const pensionesaluColRef = collection(db, 'pensionesalu');
+                let allPensions = [];
+                
+                // Dividir los DNIs en lotes de 10 (máximo para el filtro 'in')
+                const BATCH_SIZE = 10;
+                for (let i = 0; i < studentDnis.length; i += BATCH_SIZE) {
+                    const batchDnis = studentDnis.slice(i, i + BATCH_SIZE);
+                    
+                    const qPensions = query(
+                        pensionesaluColRef,
+                        where('idEstudiante', 'in', batchDnis),
+                        orderBy('orden', 'asc') // Ordenar por mes (orden)
+                    );
+                    
+                    const pensionsSnapshot = await getDocs(qPensions);
+                    pensionsSnapshot.forEach(doc => {
+                        // Guardar la data de la pensión junto con su ID
+                        allPensions.push({
+                            id: doc.id,
+                            ...doc.data()
+                        });
+                    });
+                }
+                
+                if (allPensions.length === 0) {
+                    loadingMessageDiv.textContent = 'No se encontraron pensiones para los alumnos de 3ºB.';
+                    document.getElementById('pensionsContainer').style.display = 'none';
+                    return;
+                }
+                
+                // 3. Renderizar la tabla
+                allPensions.forEach(pension => {
+                    const studentName = dniToNameMap[pension.idEstudiante] || `DNI: ${pension.idEstudiante}`;
+                    const row = document.createElement('tr');
+                    
+                    // Crea el control Select para cambiar el estado
+                    const statusSelect = document.createElement('select');
+                    statusSelect.className = `status-select status-${pension.estado.toLowerCase()}`;
+                    statusSelect.setAttribute('data-id', pension.id);
+                    statusSelect.addEventListener('change', (e) => {
+                        updatePensionStatus(pension.id, e.target.value);
+                    });
+
+                    ESTADOS_PENSION.forEach(status => {
+                        const option = document.createElement('option');
+                        option.value = status;
+                        option.textContent = status;
+                        if (status === pension.estado) {
+                            option.selected = true;
+                        }
+                        statusSelect.appendChild(option);
+                    });
+                    
+                    // Rellenar la fila
+                    row.innerHTML = `
+                        <td>${studentName}</td>
+                        <td>${pension.mes}</td>
+                        <td>S/. ${pension.monto.toFixed(2)}</td>
+                        <td>${formatDate(pension.fechaVencimiento)}</td>
+                        <td><span class="status-label status-${pension.estado.toLowerCase()}">${pension.estado}</span></td>
+                        <td class="action-cell"></td>
+                    `;
+                    
+                    // Insertar el select en la celda de acción
+                    row.querySelector('.action-cell').appendChild(statusSelect);
+                    pensionsBody.appendChild(row);
+                });
+
+                document.getElementById('pensionsContainer').style.display = 'block';
+                loadingMessageDiv.style.display = 'none';
+
+            } catch (error) {
+                console.error("Error al cargar pensiones:", error);
+                loadingMessageDiv.textContent = 'Error al cargar pensiones: ' + error.message;
+                loadingMessageDiv.className = 'loading error';
+            }
+        }
+
+        window.addEventListener('load', loadStudentsAndPensions);
+    </script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333; }
+        .container { max-width: 1200px; margin: 20px auto; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 5px; }
+        p { text-align: center; color: #666; margin-bottom: 25px; }
+        .loading { text-align: center; margin-top: 20px; font-weight: bold; }
+        
+        #pensionsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        #pensionsTable th, #pensionsTable td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        #pensionsTable th { background-color: #f0f0f0; color: #333; font-weight: bold; }
+        #pensionsTable tr:nth-child(even) { background-color: #fafafa; }
+        
+        /* Estilos para el select de estado */
+        .status-select { 
+            padding: 8px; 
+            border-radius: 4px; 
+            border: 1px solid #ccc;
+            cursor: pointer;
+            width: 120px;
+        }
+
+        /* Estilos para etiquetas de estado (opcional, para la columna Estado) */
+        .status-label {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+            min-width: 80px;
+            text-align: center;
+        }
+        .status-pendiente { background-color: #ffc107; color: #333; } /* Amarillo/Naranja */
+        .status-pagado { background-color: #28a745; } /* Verde */
+        .status-vencido { background-color: #dc3545; } /* Rojo */
+        .status-anulado { background-color: #6c757d; } /* Gris */
+
+        .message { margin-top: 15px; padding: 10px; border-radius: 4px; font-weight: bold; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gestión de Pensiones (Grado 3ºB)</h1>
+        <p>Aquí puede ver el estado de todas las pensiones generadas para los alumnos y cambiar su estado.</p>
+        
+        <div id="loadingMessage" class="loading">Cargando alumnos y pensiones...</div>
+        
+        <div id="pensionsContainer" style="display: none;">
+            <table id="pensionsTable">
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Mes</th>
+                        <th>Monto</th>
+                        <th>Vencimiento</th>
+                        <th>Estado Actual</th>
+                        <th>Cambiar Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="pensionsBody">
+                    </tbody>
+            </table>
+        </div>
+        
+        <div id="statusMessage" class="message" style="display: none;"></div>
+    </div>
+</body>
+</html>

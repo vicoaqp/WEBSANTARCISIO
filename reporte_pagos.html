@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Pagos Diarios</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+        import { getFirestore, collection, query, where, getDocs, Timestamp, orderBy } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Referencias al DOM
+        const fechaInput = document.getElementById('fecha-filtro');
+        const searchButton = document.getElementById('searchButton');
+        const messageBox = document.getElementById('messageBox');
+        const reportBody = document.getElementById('reportBody');
+        const reportFooter = document.getElementById('reportFooter');
+        const reportContainer = document.getElementById('reporte-container');
+        
+        // ⚠️ NUEVO: Referencia al botón de PDF
+        const pdfButton = document.getElementById('pdfButton');
+
+        /**
+         * Muestra un mensaje en el área de mensajes global.
+         */
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = `message ${type}`;
+            messageBox.style.display = 'block';
+        }
+
+        /**
+         * Formatea un Timestamp de Firestore a una hora y fecha legibles.
+         */
+        function formatFullTimestamp(timestamp) {
+            if (!timestamp || !timestamp.toDate) return 'N/A';
+            const date = timestamp.toDate();
+            return date.toLocaleString('es-ES', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+
+        /**
+         * Carga los datos de Alumnos desde 'students'
+         */
+        async function getStudentsData(dniList) {
+            const studentCache = new Map();
+            const studentsRef = collection(db, "students");
+            
+            const batches = [];
+            for (let i = 0; i < dniList.length; i += 10) {
+                batches.push(dniList.slice(i, i + 10));
+            }
+
+            for (const batch of batches) {
+                const q = query(studentsRef, where("idEstudiante", "in", batch));
+                const snapshot = await getDocs(q);
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    studentCache.set(data.idEstudiante, data); 
+                });
+            }
+            return studentCache;
+        }
+
+        /**
+         * Carga los datos de Padres desde 'usuario'
+         */
+        async function getParentsData(dniList) {
+            const parentCache = new Map();
+            const parentsRef = collection(db, "usuario");
+            
+            const batches = [];
+            for (let i = 0; i < dniList.length; i += 10) {
+                batches.push(dniList.slice(i, i + 10));
+            }
+
+            for (const batch of batches) {
+                const q = query(parentsRef, where("dni", "in", batch));
+                const snapshot = await getDocs(q);
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    parentCache.set(data.dni, data);
+                });
+            }
+            return parentCache;
+        }
+
+
+        /**
+         * Lógica principal: Buscar pagos por fecha
+         */
+        async function searchPayments() {
+            const selectedDate = fechaInput.value;
+            if (!selectedDate) {
+                showMessage("Por favor, seleccione una fecha.", 'error');
+                return;
+            }
+
+            showMessage("Generando reporte (puede tardar un momento)...", 'loading');
+            reportBody.innerHTML = '';
+            reportFooter.innerHTML = '';
+            reportContainer.style.display = 'none';
+            pdfButton.style.display = 'none'; // ⚠️ NUEVO: Ocultar botón PDF
+
+            try {
+                // 1. Crear el rango de fecha
+                const startDate = new Date(`${selectedDate}T00:00:00`);
+                const endDate = new Date(`${selectedDate}T23:59:59`);
+                
+                const startTimestamp = Timestamp.fromDate(startDate);
+                const endTimestamp = Timestamp.fromDate(endDate);
+
+                // 2. Crear la consulta
+                const qPayments = query(
+                    collection(db, 'pensionesalu'),
+                    where('estado', '==', 'PAGADO'),
+                    where('fechaPago', '>=', startTimestamp),
+                    where('fechaPago', '<=', endTimestamp),
+                    orderBy('fechaPago', 'asc') 
+                );
+
+                const paymentsSnap = await getDocs(qPayments);
+
+                if (paymentsSnap.empty) {
+                    showMessage("No se encontraron pagos registrados para esta fecha.", 'info');
+                    return;
+                }
+
+                // 3. Recolectar y Cargar datos de Alumnos
+                const studentDniSet = new Set(paymentsSnap.docs.map(doc => doc.data().idEstudiante));
+                const studentCache = await getStudentsData(Array.from(studentDniSet));
+
+                // 4. Recolectar y Cargar datos de Padres
+                const parentDniSet = new Set();
+                studentCache.forEach(student => {
+                    if (student.dnipapa) {
+                        parentDniSet.add(student.dnipapa);
+                    }
+                });
+                const parentCache = await getParentsData(Array.from(parentDniSet));
+
+                let totalDiario = 0;
+
+                // 5. Llenar la tabla
+                paymentsSnap.forEach(doc => {
+                    const pago = doc.data();
+                    
+                    const student = studentCache.get(pago.idEstudiante) || {};
+                    const studentName = `${student.nombres || 'Alumno'} ${student.apellidos || 'Desconocido'}`;
+                    const studentGrade = `${student.grado || 'N/A'}° ${student.seccion || 'N/A'}`;
+                    
+                    const parent = parentCache.get(student.dnipapa) || {};
+                    const parentName = `${parent.nombres || ''} ${parent.apellidos || 'No Asignado'}`;
+                    
+                    totalDiario += pago.monto || 0;
+                    
+                    const row = reportBody.insertRow();
+                    row.innerHTML = `
+                        <td>${formatFullTimestamp(pago.fechaPago)}</td>
+                        <td>${parentName}</td>
+                        <td>${studentName}</td>
+                        <td>${studentGrade}</td>
+                        <td>${pago.mes}</td>
+                        <td>${pago.boletaSerie || 'N/A'} - ${pago.boletaNumero || 'N/A'}</td>
+                        <td>S/. ${pago.monto.toFixed(2)}</td>
+                    `;
+                });
+
+                // 6. Mostrar el total
+                reportFooter.innerHTML = `
+                    <tr>
+                        <td colspan="6"><strong>SUMA TOTAL DEL DÍA:</strong></td>
+                        <td><strong>S/. ${totalDiario.toFixed(2)}</strong></td>
+                    </tr>
+                `;
+                
+                reportContainer.style.display = 'table';
+                pdfButton.style.display = 'inline-block'; // ⚠️ NUEVO: Mostrar botón PDF
+                messageBox.style.display = 'none';
+
+            } catch (error) {
+                console.error("Error al generar reporte:", error);
+                if (error.code === 'failed-precondition') {
+                    showMessage("ERROR: Faltan índices en Firestore. Revisa la consola (F12) para crear el índice compuesto requerido.", 'error');
+                } else {
+                    showMessage(`Error al buscar pagos: ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        // -----------------------------------------------------------------
+        // ⚠️ NUEVA FUNCIÓN: EXPORTAR A PDF
+        // -----------------------------------------------------------------
+        function exportToPDF() {
+            // Obtener el objeto jsPDF (cargado globalmente desde el script)
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape', // Hoja en horizontal
+                unit: 'pt', // Usar puntos
+                format: 'a4' // Tamaño A4
+            });
+
+            const selectedDate = fechaInput.value;
+            const title = `Reporte de Pagos - ${selectedDate}`;
+
+            // Añadir título al PDF
+            doc.setFontSize(18);
+            doc.text(title, 40, 40);
+
+            // Usar el plugin autoTable para leer la tabla HTML
+            doc.autoTable({
+                html: '#reporte-container', // El ID de tu <table>
+                startY: 50, // Dónde empezar (debajo del título)
+                theme: 'grid', // Estilo de la tabla
+                headStyles: { 
+                    fillColor: [0, 123, 255] // Color azul para el encabezado
+                },
+                styles: {
+                    fontSize: 8 // Letra pequeña para que quepa
+                },
+                // Asegurarse que el footer (total) también se incluya
+                includeHiddenHtml: true, 
+                showFoot: 'lastPage' 
+            });
+
+            // Guardar el archivo
+            doc.save(`reporte_pagos_${selectedDate}.pdf`);
+        }
+        
+
+        // --- Event Listeners ---
+        searchButton.addEventListener('click', searchPayments);
+        pdfButton.addEventListener('click', exportToPDF); // ⚠️ NUEVO: Listener para el PDF
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            fechaInput.value = new Date().toISOString().split('T')[0];
+        });
+
+    </script>
+    <style>
+        /* Estilos Dark Mode (reutilizados de asistencia.html) */
+        :root {
+            --color-bg-dark: #121212;
+            --color-bg-surface: #1e1e1e;
+            --color-text-light: #e0e0e0;
+            --color-text-muted: #b0b0b0;
+            --color-primary-accent: #03dac6;
+            --color-border: #444;
+            --color-input-bg: #2c2c2c;
+            --color-table-header-bg: #007bff;
+        }
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: var(--color-bg-dark);
+            color: var(--color-text-light);
+        }
+        .container {
+            max-width: 1200px; /* Ancho aumentado para más columnas */
+            margin: auto;
+            background: var(--color-bg-surface);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        h1 {
+            color: var(--color-primary-accent);
+            border-bottom: 2px solid var(--color-primary-accent);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* --- Estilos de Filtros --- */
+        .filtros {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end; /* Alinear botón y input */
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            background-color: #262626;
+        }
+        .filtro-grupo {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--color-text-light);
+        }
+        input[type="date"] {
+            padding: 10px;
+            border: 1px solid var(--color-border);
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: var(--color-input-bg);
+            color: var(--color-text-light);
+            color-scheme: dark; /* Para que el picker de fecha sea oscuro */
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            background-color: var(--color-table-header-bg);
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* ⚠️ NUEVO: Estilo para el botón PDF */
+        #pdfButton {
+            background-color: #c9302c; /* Color rojo para PDF */
+        }
+        #pdfButton:hover {
+            background-color: #a92825;
+        }
+
+
+        /* --- Estilos de Tabla de Resultados --- */
+        .resultados-tabla {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            display: none; /* Oculta hasta que haya datos */
+        }
+        .resultados-tabla th,
+        .resultados-tabla td {
+            border: 1px solid var(--color-border);
+            padding: 12px;
+            text-align: left;
+        }
+        .resultados-tabla th {
+            background-color: var(--color-table-header-bg);
+            color: white;
+            text-transform: uppercase;
+        }
+        .resultados-tabla tr {
+            background-color: var(--color-bg-surface);
+        }
+        .resultados-tabla tr:hover {
+            background-color: #383838;
+        }
+        .resultados-tabla tr:nth-child(even) {
+            background-color: #2c2c2c;
+        }
+        
+        /* --- Estilos del Footer de la Tabla (Total) --- */
+        .resultados-tabla tfoot tr {
+            background-color: #004a99; /* Un azul más oscuro */
+            border-top: 3px solid var(--color-table-header-bg);
+        }
+        .resultados-tabla tfoot td {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+        }
+        .resultados-tabla tfoot td:last-child {
+            font-size: 1.3em;
+            color: #81c784; /* Verde para el monto total */
+        }
+
+        /* --- Mensajes de Estado --- */
+        .message { 
+            margin-bottom: 20px; padding: 15px; border-radius: 4px; 
+            font-weight: bold; text-align: center; display: none;
+        }
+        .success { background-color: #388e3c; color: white; }
+        .error { background-color: #d32f2f; color: white; }
+        .loading { background-color: #ffa000; color: #121212; }
+        .info { background-color: #0277bd; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💵 Reporte de Pagos Diarios</h1>
+
+        <div class="filtros">
+            <div class="filtro-grupo">
+                <label for="fecha-filtro">Seleccionar Fecha del Reporte</label>
+                <input type="date" id="fecha-filtro">
+            </div>
+            <button id="searchButton">Generar Reporte</button>
+            
+            <button id="pdfButton" style="display: none;">Exportar a PDF</button>
+        </div>
+
+        <div id="messageBox" class="message" style="display:none;"></div>
+
+        <table class="resultados-tabla" id="reporte-container">
+            <thead>
+                <tr>
+                    <th>Fecha y Hora</th>
+                    <th>Apoderado</th>
+                    <th>Alumno</th>
+                    <th>Grado/Sec.</th>
+                    <th>Mes Pagado</th>
+                    <th>Boleta (Serie-Num)</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+            <tbody id="reportBody">
+                </tbody>
+            <tfoot id="reportFooter">
+                </tfoot>
+        </table>
+    </div>
+</body>
+</html>

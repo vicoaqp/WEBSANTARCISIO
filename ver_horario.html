@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horarios por Salón</title>
+    <style>
+        /* =======================================
+           ESTILOS DARK MODE (Basado en padres.html)
+           ======================================= */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #0d1117; 
+            color: #f0f6fc; 
+            line-height: 1.6; 
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #161b22; 
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); 
+        }
+        h1 {
+            color: #c9d1d9;
+            font-size: 28px;
+            border-bottom: 2px solid #58a6ff; 
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+
+        /* --- Estilo de Filtros --- */
+        .filtros {
+            display: flex;
+            align-items: flex-end;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            background-color: #0d1117;
+        }
+        .filtro-grupo {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            max-width: 250px;
+        }
+        label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #8b949e; 
+        }
+        select {
+            padding: 10px;
+            border: 1px solid #484f58; 
+            border-radius: 6px;
+            font-size: 16px;
+            background-color: #21262d; 
+            color: #f0f6fc;
+            cursor: pointer;
+        }
+        
+        /* --- Estilos de Tabla de Horario --- */
+        .horario-tabla {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            overflow: hidden; 
+        }
+        .horario-tabla th, .horario-tabla td {
+            border: 1px solid #30363d;
+            padding: 15px 12px; 
+            text-align: center;
+            height: 70px; 
+            vertical-align: middle;
+        }
+        .horario-tabla thead th {
+            background-color: #58a6ff;
+            color: #0d1117;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .horario-tabla tbody tr {
+            background-color: #1e2127;
+        }
+        .horario-tabla tbody tr:nth-child(even) {
+            background-color: #161b22; /* Cebra */
+        }
+        .horario-tabla tbody td {
+            color: #c9d1d9;
+            line-height: 1.4;
+        }
+
+        .celda-curso strong {
+            font-size: 1.1em;
+            color: #f0f6fc; 
+        }
+        .celda-curso .hora-detalle {
+            font-size: 0.9em;
+            color: #8b949e; 
+            margin-top: 4px;
+        }
+
+        /* --- Mensajes de Estado --- */
+        #mensajes p {
+            padding: 15px; margin-top: 15px; border-radius: 8px; font-weight: 500;
+            background-color: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+            text-align: center; font-size: 1.1em;
+        }
+        #mensaje-cargando { color: #ffd700; }
+        #mensaje-error {
+            background-color: #6d0a1c; color: #ff7b72; border: 1px solid #a40e26;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🗓️ Visor de Horarios Escolares</h1>
+
+        <div class="filtros">
+            <div class="filtro-grupo">
+                <label for="grado-filtro">Grado</label>
+                <select id="grado-filtro">
+                    </select>
+            </div>
+
+            <div class="filtro-grupo">
+                <label for="seccion-filtro">Sección</label>
+                <select id="seccion-filtro">
+                    </select>
+            </div>
+        </div>
+
+        <div id="mensajes">
+            <p id="mensaje-cargando" style="display: none;">Cargando...</p>
+            <p id="mensaje-error" style="display: none;"></p>
+        </div>
+        
+        <div class="resultados" id="horario-container" style="display: none;">
+             <table class="horario-tabla">
+                <thead>
+                    <tr>
+                        <th>Lunes</th>
+                        <th>Martes</th>
+                        <th>Miércoles</th>
+                        <th>Jueves</th>
+                        <th>Viernes</th>
+                    </tr>
+                </thead>
+                <tbody id="horario-body">
+                    </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Referencias al DOM
+        const gradoSelect = document.getElementById('grado-filtro');
+        const seccionSelect = document.getElementById('seccion-filtro');
+        const horarioContainer = document.getElementById('horario-container');
+        const horarioBody = document.getElementById('horario-body');
+        const mensajeCargando = document.getElementById('mensaje-cargando');
+        const mensajeError = document.getElementById('mensaje-error');
+        
+        const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+
+        /**
+         * Inicializa los filtros y los event listeners
+         */
+        function init() {
+            // Poblar filtros
+            const grados = ['1', '2', '3', '4', '5'];
+            const secciones = ['A', 'B', 'C', 'D'];
+
+            grados.forEach(g => {
+                gradoSelect.options.add(new Option(g + "°", g));
+            });
+            secciones.forEach(s => {
+                seccionSelect.options.add(new Option(s, s));
+            });
+
+            // Establecer valores por defecto (ej. 3B como en tu ejemplo)
+            gradoSelect.value = '3';
+            seccionSelect.value = 'B';
+
+            // Añadir listeners
+            gradoSelect.addEventListener('change', cargarHorario);
+            seccionSelect.addEventListener('change', cargarHorario);
+
+            // Carga inicial
+            cargarHorario();
+        }
+
+        /**
+         * Muestra/Oculta mensajes de estado
+         */
+        function mostrarMensaje(tipo, texto) {
+            mensajeCargando.style.display = (tipo === 'cargando') ? 'block' : 'none';
+            mensajeError.style.display = (tipo === 'error') ? 'block' : 'none';
+            
+            if (tipo === 'error') {
+                mensajeError.textContent = texto;
+            }
+            
+            // Ocultar la tabla si hay un error o se está cargando
+            if (tipo === 'cargando' || tipo === 'error') {
+                horarioContainer.style.display = 'none';
+            } else {
+                horarioContainer.style.display = 'block';
+            }
+        }
+
+        /**
+         * Lógica principal para cargar y procesar el horario
+         */
+        async function cargarHorario() {
+            mostrarMensaje('cargando');
+            const grado = gradoSelect.value;
+            const seccion = seccionSelect.value;
+
+            // El ID del documento es la combinación de grado y sección (ej. "3B")
+            const docId = grado + seccion;
+
+            try {
+                const docRef = db.collection("horarios_por_grado").doc(docId);
+                const docSnap = await docRef.get();
+
+                if (!docSnap.exists) { 
+                    mostrarMensaje('error', `No se encontró un horario para ${grado}° ${seccion}.`);
+                    return;
+                }
+
+                const horarioData = docSnap.data();
+                
+                // Procesar los datos para renderizar la tabla
+                procesarYRenderizar(horarioData);
+                
+                mostrarMensaje('listo'); // Oculta mensajes y muestra la tabla
+
+            } catch (error) {
+                console.error("Error al cargar horario:", error);
+                mostrarMensaje('error', 'Error al conectar con la base de datos.');
+            }
+        }
+
+        /**
+         * Procesa los datos y los renderiza en la tabla HTML
+         * ========== ¡FUNCIÓN CORREGIDA CON parseInt! ==========
+         */
+        function procesarYRenderizar(horarioData) {
+            horarioBody.innerHTML = ''; // Limpiar tabla
+            
+            let maxOrden = 0;
+            const horarioProcesado = {}; // { lunes: [ {orden: 1, ...} ], martes: [ ... ] }
+
+            // 1. Unificar, Ordenar y Encontrar maxOrden
+            DIAS_SEMANA.forEach(dia => {
+                let diaArray = []; // Empezar con un array vacío
+
+                // A. Si los datos son un ARRAY (como en tus capturas)
+                if (horarioData[dia] && Array.isArray(horarioData[dia])) {
+                    diaArray = horarioData[dia];
+                
+                // B. Si los datos son un MAPA (la estructura de "objeto" { "0": ... })
+                } else if (horarioData[dia] && typeof horarioData[dia] === 'object') {
+                    diaArray = Object.values(horarioData[dia]);
+                }
+                
+                // ========== ¡CORRECCIÓN 1: Usar parseInt() para el sort! ==========
+                // Esto arregla la mezcla de números (1) y texto ("2")
+                const diaOrdenado = diaArray.sort((a, b) => {
+                    const ordenA = parseInt(a.orden || 0, 10);
+                    const ordenB = parseInt(b.orden || 0, 10);
+                    return ordenA - ordenB;
+                });
+                
+                horarioProcesado[dia] = diaOrdenado;
+
+                // --- Calcular maxOrden ---
+                if (diaOrdenado.length > 0) {
+                    
+                    // ========== ¡CORRECCIÓN 2: Usar parseInt() para maxOrden! ==========
+                    const ultimoOrden = parseInt(diaOrdenado[diaOrdenado.length - 1].orden, 10);
+                    if (ultimoOrden > maxOrden) {
+                        maxOrden = ultimoOrden;
+                    }
+                }
+            });
+
+            // 2. Construir las filas de la tabla, una por cada 'orden'
+            for (let i = 1; i <= maxOrden; i++) {
+                const row = horarioBody.insertRow();
+                
+                // Celdas 1-5: Cursos + Horas
+                DIAS_SEMANA.forEach(dia => {
+                    const celdaDia = row.insertCell();
+                    celdaDia.className = 'celda-curso'; // Asignar clase para estilo
+
+                    // ========== ¡CORRECCIÓN 3: Usar parseInt() para el find! ==========
+                    // Esto asegura que i (ej. 2) coincida con p.orden (ej. "2")
+                    const periodo = horarioProcesado[dia].find(p => parseInt(p.orden, 10) === i);
+                    
+                    if (periodo) {
+                        // Mostrar curso y hora en la misma celda
+                        celdaDia.innerHTML = `
+                            <strong>${periodo.curso}</strong>
+                            <div class="hora-detalle">
+                                ${periodo.hora_inicio} - ${periodo.hora_fin}
+                            </div>
+                        `;
+                    } else {
+                        celdaDia.textContent = '---'; // Celda vacía
+                    }
+                });
+            }
+        }
+
+        // Cargar todo al iniciar
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+</body>
+</html>

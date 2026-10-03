@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Pago de Pensión</title>
+    
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js';
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc, Timestamp, orderBy, limit } from 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Referencias al DOM
+        const messageBox = document.getElementById('messageBox');
+        
+        // --- Pestañas de Búsqueda ---
+        const tabDni = document.getElementById('tab-dni');
+        const tabGrado = document.getElementById('tab-grado');
+        const searchByDniContainer = document.getElementById('search-by-dni-container');
+        const searchByGradoContainer = document.getElementById('search-by-grado-container');
+        
+        // --- Búsqueda por DNI ---
+        const dniInput = document.getElementById('dniInput');
+        const dniSearchButton = document.getElementById('dniSearchButton');
+        
+        // --- Búsqueda por Grado ---
+        const gradoSelect = document.getElementById('gradoSelect');
+        const seccionSelect = document.getElementById('seccionSelect');
+        const gradoSearchButton = document.getElementById('gradoSearchButton');
+
+        // --- Paso 2: Seleccionar Alumno ---
+        const studentSelectContainer = document.getElementById('select-student-container');
+        const parentNameTitle = document.getElementById('parent-name-title');
+        const studentSelect = document.getElementById('studentSelect');
+        
+        // --- Paso 3: Pensiones ---
+        const pensionsContainer = document.getElementById('pensions-container');
+        const pensionsBody = document.getElementById('pensionsBody');
+
+        /**
+         * Inicializa los selectores y pestañas
+         */
+        function init() {
+            // Lógica de pestañas
+            tabDni.addEventListener('click', () => {
+                tabDni.classList.add('active');
+                tabGrado.classList.remove('active');
+                searchByDniContainer.style.display = 'block';
+                searchByGradoContainer.style.display = 'none';
+            });
+            tabGrado.addEventListener('click', () => {
+                tabGrado.classList.add('active');
+                tabDni.classList.remove('active');
+                searchByDniContainer.style.display = 'none';
+                searchByGradoContainer.style.display = 'block';
+            });
+            
+            // Llenar Grados y Secciones
+            const grados = ['1', '2', '3', '4', '5'];
+            const secciones = ['A', 'B', 'C', 'D'];
+            grados.forEach(g => gradoSelect.add(new Option(g + "°", g)));
+            secciones.forEach(s => seccionSelect.add(new Option(s, s)));
+        }
+
+        /**
+         * Muestra un mensaje en el área de mensajes global.
+         */
+        function showMessage(message, type = 'info') {
+            messageBox.textContent = message;
+            messageBox.className = `message ${type}`;
+            messageBox.style.display = 'block';
+        }
+
+        /**
+         * Formatea un Timestamp de Firestore a una fecha legible.
+         */
+        function formatDate(timestamp) {
+            if (!timestamp || !timestamp.toDate) return 'N/A';
+            const date = timestamp.toDate();
+            return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        /**
+         * Limpia los resultados de búsqueda (Paso 2 y 3)
+         */
+        function resetSearchResults() {
+            studentSelectContainer.style.display = 'none';
+            pensionsContainer.style.display = 'none';
+            studentSelect.innerHTML = '<option value="">-- Seleccione un alumno --</option>';
+            parentNameTitle.style.display = 'none'; // Ocultar por defecto
+        }
+
+        /**
+         * MÉTODO 1: Buscar por DNI del Apoderado
+         */
+        async function searchByDni() {
+            const parentDni = dniInput.value.trim();
+            if (!parentDni) {
+                showMessage("Por favor, ingrese un DNI del padre.", 'error');
+                return;
+            }
+
+            showMessage("Buscando apoderado y alumnos...", 'loading');
+            resetSearchResults();
+
+            try {
+                // 1. Buscar al padre en la colección 'usuario'
+                const qParent = query(collection(db, "usuario"), where("dni", "==", parentDni), limit(1));
+                const parentSnap = await getDocs(qParent);
+
+                if (parentSnap.empty) {
+                    showMessage(`No se encontró ningún padre con el DNI: ${parentDni}`, 'error');
+                    return;
+                }
+                
+                const parentData = parentSnap.docs[0].data();
+                parentNameTitle.textContent = `Apoderado: ${parentData.nombres || ''} ${parentData.apellidos || ''}`;
+                parentNameTitle.style.display = 'block'; // Mostrar el nombre
+
+                // 2. Buscar a los hijos en la colección 'students'
+                const qStudents = query(collection(db, "students"), where("dnipapa", "==", parentDni), orderBy("nombres"));
+                const studentsSnap = await getDocs(qStudents);
+
+                if (studentsSnap.empty) {
+                    showMessage("Este apoderado no tiene alumnos asociados.", 'error');
+                    return;
+                }
+
+                // 3. Llenar el <select> de hijos
+                studentsSnap.forEach(doc => {
+                    const student = doc.data();
+                    const option = document.createElement('option');
+                    option.value = student.idEstudiante; // Guardamos el DNI del alumno
+                    option.textContent = `${student.nombres} ${student.apellidos} (${student.grado}° ${student.seccion})`;
+                    studentSelect.appendChild(option);
+                });
+
+                showMessage("Apoderado encontrado. Por favor, seleccione un alumno.", 'success');
+                studentSelectContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error("Error en Método 1 (Buscar DNI):", error);
+                showMessage(`Error al buscar datos: ${error.message}`, 'error');
+            }
+        }
+        
+        /**
+         * MÉTODO 2: Buscar por Grado y Sección
+         */
+        async function searchByGrado() {
+            const grado = gradoSelect.value;
+            const seccion = seccionSelect.value;
+
+            showMessage("Buscando alumnos en el salón...", 'loading');
+            resetSearchResults();
+
+            try {
+                // 1. Buscar alumnos en la colección 'students'
+                const qStudents = query(collection(db, "students"), 
+                    where("grado", "==", grado), 
+                    where("seccion", "==", seccion), 
+                    orderBy("apellidos") // Ordenar por apellido
+                );
+                const studentsSnap = await getDocs(qStudents);
+
+                if (studentsSnap.empty) {
+                    showMessage(`No se encontraron alumnos en ${grado}° ${seccion}.`, 'info');
+                    return;
+                }
+                
+                // 2. Llenar el <select> de alumnos
+                studentsSnap.forEach(doc => {
+                    const student = doc.data();
+                    const option = document.createElement('option');
+                    option.value = student.idEstudiante;
+                    option.textContent = `${student.apellidos}, ${student.nombres}`; // Apellido primero
+                    studentSelect.appendChild(option);
+                });
+
+                showMessage(`Alumnos de ${grado}° ${seccion} cargados.`, 'success');
+                studentSelectContainer.style.display = 'block';
+
+            } catch (error) {
+                console.error("Error en Método 2 (Buscar Grado):", error);
+                 if (error.code === 'failed-precondition') {
+                    showMessage("ERROR: Faltan índices en Firestore. Revisa la consola (F12) para crear el índice compuesto requerido.", 'error');
+                } else {
+                    showMessage(`Error al buscar alumnos: ${error.message}`, 'error');
+                }
+            }
+        }
+
+
+        /**
+         * PASO 2: Cargar las pensiones PENDIENTES del hijo seleccionado (Sin cambios)
+         */
+        async function loadPendingPensions() {
+            const studentDni = studentSelect.value;
+            pensionsBody.innerHTML = '';
+            pensionsContainer.style.display = 'none';
+
+            if (!studentDni) {
+                showMessage("Seleccione un alumno para ver sus pensiones.", 'info');
+                return;
+            }
+
+            showMessage("Cargando pensiones pendientes...", 'loading');
+            
+            try {
+                const qPensions = query(
+                    collection(db, 'pensionesalu'),
+                    where('idEstudiante', '==', studentDni),
+                    where('estado', '==', 'PENDIENTE'),
+                    orderBy('orden', 'asc')
+                );
+                
+                const pensionsSnapshot = await getDocs(qPensions);
+                
+                if (pensionsSnapshot.empty) {
+                    showMessage("Este alumno no tiene pensiones pendientes de pago.", 'success');
+                    return;
+                }
+                
+                pensionsSnapshot.forEach(docData => {
+                    const pension = {
+                        id: docData.id,
+                        ...docData.data()
+                    };
+                    const row = document.createElement('tr');
+                    row.id = `pension-row-${pension.id}`; 
+                    
+                    row.innerHTML = `
+                        <td>${pension.mes}</td>
+                        <td>S/. ${pension.monto.toFixed(2)}</td>
+                        <td>
+                            <input type="text" class="input-serie" placeholder="Serie (B001)" size="6">
+                            -
+                            <input type="text" class="input-numero" placeholder="Número" size="10">
+                        </td>
+                        <td>
+                            <button class="pay-button" data-pension-id="${pension.id}">
+                                Registrar Pago
+                            </button>
+                        </td>
+                    `;
+                    pensionsBody.appendChild(row);
+                });
+
+                pensionsContainer.style.display = 'block';
+                messageBox.style.display = 'none'; 
+
+            } catch (error) {
+                console.error("Error en Paso 2 (Cargar Pensiones):", error);
+                if (error.code === 'failed-precondition') {
+                    showMessage("ERROR: Faltan índices en Firestore. Revisa la consola (F12) para crear el índice compuesto requerido.", 'error');
+                } else {
+                    showMessage(`Error al cargar pensiones: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        /**
+         * PASO 3: Registrar el pago de una pensión (Sin cambios)
+         */
+        async function handlePayment(e) {
+            if (!e.target.classList.contains('pay-button')) {
+                return;
+            }
+
+            const button = e.target;
+            const pensionId = button.dataset.pensionId;
+            const row = document.getElementById(`pension-row-${pensionId}`);
+            
+            const inputSerie = row.querySelector('.input-serie');
+            const inputNumero = row.querySelector('.input-numero');
+            
+            const serie = inputSerie.value.trim();
+            const numero = inputNumero.value.trim();
+            
+            if (!serie || !numero) {
+                showMessage("Por favor, ingrese la Serie y Número de la boleta.", 'error');
+                return;
+            }
+
+            if (!confirm(`¿Registrar pago con Boleta ${serie}-${numero}?`)) {
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Procesando...';
+            inputSerie.disabled = true;
+            inputNumero.disabled = true;
+            
+            try {
+                const pensionRef = doc(db, 'pensionesalu', pensionId);
+                
+                const dataToUpdate = {
+                    estado: "PAGADO",
+                    fechaPago: Timestamp.now(),
+                    boletaSerie: serie,
+                    boletaNumero: numero
+                };
+                
+                await updateDoc(pensionRef, dataToUpdate);
+
+                button.textContent = 'Pagado ✅';
+                button.classList.add('paid');
+                row.style.backgroundColor = '#2a4a2c';
+                showMessage(`Pago registrado con éxito (Boleta ${serie}-${numero}).`, 'success');
+
+            } catch (error) {
+                console.error("Error en Paso 3 (Registrar Pago):", error);
+                showMessage(`Error al registrar el pago: ${error.message}`, 'error');
+                button.disabled = false;
+                button.textContent = 'Registrar Pago';
+                inputSerie.disabled = false;
+                inputNumero.disabled = false;
+            }
+        }
+
+        // --- Event Listeners ---
+        document.addEventListener('DOMContentLoaded', init);
+        dniSearchButton.addEventListener('click', searchByDni);
+        gradoSearchButton.addEventListener('click', searchByGrado);
+        studentSelect.addEventListener('change', loadPendingPensions);
+        pensionsBody.addEventListener('click', handlePayment);
+
+    </script>
+    <style>
+        /* Estilos Dark Mode (reutilizados) */
+        :root {
+            --color-bg-dark: #121212;
+            --color-bg-surface: #1e1e1e;
+            --color-text-light: #e0e0e0;
+            --color-text-muted: #b0b0b0;
+            --color-primary-accent: #bb86fc;
+            --color-border: #444;
+            --color-input-bg: #2c2c2c;
+            --color-teal: #03dac6;
+        }
+        body { 
+            font-family: Arial, sans-serif; margin: 0; padding: 20px; 
+            background-color: var(--color-bg-dark); color: var(--color-text-light); 
+        }
+        .container { 
+            max-width: 900px; margin: 20px auto; background-color: var(--color-bg-surface); 
+            padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); 
+        }
+        h1 { 
+            color: var(--color-primary-accent); text-align: center; margin-bottom: 25px; 
+        }
+        
+        .step-container {
+            margin-bottom: 25px; padding: 20px; border: 1px solid var(--color-border);
+            border-radius: 8px; background-color: #272727;
+        }
+        .step-container h2 {
+            color: var(--color-text-light); border-bottom: 1px solid var(--color-border);
+            padding-bottom: 10px; margin-top: 0; margin-bottom: 20px;
+        }
+
+        /* --- ⚠️ NUEVO: Estilos de Pestañas --- */
+        .tab-container {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+        }
+        .tab-button {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            color: var(--color-text-muted);
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .tab-button.active {
+            color: var(--color-teal);
+            border-bottom: 3px solid var(--color-teal);
+        }
+        .search-method-container {
+            padding-top: 20px;
+        }
+        /* Por defecto, ocultar la segunda pestaña */
+        #search-by-grado-container {
+            display: none;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-group > div {
+            flex-grow: 1; /* Para que los inputs crezcan */
+        }
+        /* --- Fin Estilos de Pestañas --- */
+
+        label { 
+            display: block; margin-bottom: 8px; font-weight: bold; 
+            color: var(--color-text-light); 
+        }
+        input[type="text"], select {
+            padding: 12px; border: 1px solid var(--color-border); border-radius: 4px;
+            font-size: 16px; background-color: var(--color-input-bg);
+            color: var(--color-text-light); width: 100%;
+            box-sizing: border-box; 
+        }
+        select {
+            cursor: pointer; -webkit-appearance: none; -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23e0e0e0%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13.2-5.4H18.6c-5%200-9.3%201.8-13.2%205.4A17.6%2017.6%200%200%200%200%2082.7c0%204.8%201.8%209.1%205.4%2013.2l128%20128c3.9%203.9%208.2%205.8%2013.2%205.8s9.3-1.9%2013.2-5.8l128-128c3.9%203.9%205.8-8.2%205.8-13.2%200-4.8-1.8-9.1-5.4-13.2z%22%2F%3E%3C%2Fsvg%3E'); 
+            background-repeat: no-repeat; background-position: right 10px top 50%;
+            background-size: 12px;
+        }
+        
+        .input-serie, .input-numero { 
+            width: auto; font-size: 14px; padding: 8px; 
+            display: inline-block;
+        }
+        .input-serie { width: 80px; }
+        .input-numero { width: 120px; }
+        
+        button {
+            padding: 12px 20px; border: none; border-radius: 4px;
+            font-size: 16px; cursor: pointer; font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        /* Botones de búsqueda */
+        #dniSearchButton, #gradoSearchButton {
+            background-color: var(--color-teal);
+            color: #121212;
+            flex-shrink: 0; /* Evitar que el botón se encoja */
+        }
+        .pay-button {
+            background-color: #81c784; color: #1e1e1e; font-size: 14px;
+            padding: 10px 15px;
+        }
+        .pay-button:hover { background-color: #66bb6a; }
+        .pay-button.paid, .pay-button:disabled {
+            background-color: #555; color: #aaa; cursor: not-allowed;
+        }
+        
+        #pensionsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        #pensionsTable th, #pensionsTable td { border: 1px solid var(--color-border); padding: 12px; text-align: left; vertical-align: middle; }
+        #pensionsTable th { background-color: #333; color: var(--color-text-light); font-weight: bold; }
+        #pensionsTable tr { background-color: var(--color-bg-surface); }
+        #pensionsTable tr:nth-child(even) { background-color: #2c2c2c; }
+
+        .message { 
+            margin-bottom: 20px; padding: 15px; border-radius: 4px; 
+            font-weight: bold; text-align: center; display: none;
+        }
+        .success { background-color: #388e3c; color: white; }
+        .error { background-color: #d32f2f; color: white; }
+        .loading { background-color: #ffa000; color: #121212; }
+        .info { background-color: #0277bd; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Registrar Pago de Pensión</h1>
+        
+        <div class="step-container" id="search-student-container">
+            <h2>Paso 1: Buscar Alumno</h2>
+            
+            <div class="tab-container">
+                <button class="tab-button active" id="tab-dni">Por DNI de Apoderado</button>
+                <button class="tab-button" id="tab-grado">Por Grado y Sección</button>
+            </div>
+            
+            <div class="search-method-container" id="search-by-dni-container">
+                <div class="input-group">
+                    <div>
+                        <label for="dniInput">DNI del Apoderado:</label>
+                        <input type="text" id="dniInput" placeholder="Ingrese el DNI del padre o madre...">
+                    </div>
+                    <button id="dniSearchButton">Buscar</button>
+                </div>
+            </div>
+            
+            <div class="search-method-container" id="search-by-grado-container">
+                <div class="input-group">
+                    <div>
+                        <label for="gradoSelect">Grado:</label>
+                        <select id="gradoSelect"></select>
+                    </div>
+                    <div>
+                        <label for="seccionSelect">Sección:</label>
+                        <select id="seccionSelect"></select>
+                    </div>
+                    <button id="gradoSearchButton">Buscar</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="messageBox" class="message" style="display: none;"></div>
+        
+        <div class="step-container" id="select-student-container" style="display: none;">
+            <h2 id="parent-name-title" style="display: none;">Apoderado:</h2>
+            <label for="studentSelect">Paso 2: Seleccionar Alumno</label>
+            <select id="studentSelect">
+                <option value="">-- Seleccione un alumno --</option>
+            </select>
+        </div>
+        
+        <div class="step-container" id="pensions-container" style="display: none;">
+            <h2>Paso 3: Registrar Pagos Pendientes</h2>
+            <table id="pensionsTable">
+                <thead>
+                    <tr>
+                        <th>Mes</th>
+                        <th>Monto</th>
+                        <th>N° Boleta (Serie-Num)</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="pensionsBody">
+                    </tbody>
+            </table>
+        </div>
+        
+    </div>
+</body>
+</html>

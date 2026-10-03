@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Santarcisio 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .animated-gradient {
+            background: linear-gradient(-45deg, #1e1b4b, #312e81, #4c1d95, #1e293b);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-8px) scale(1.02);
+        }
+        
+        .icon-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .glass-effect {
+            background: rgba(31, 41, 55, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+        
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+    </style>
+</head>
+<body class="animated-gradient text-gray-100 min-h-screen p-4 md:p-8">
+
+    <!-- Header con efecto glassmorphism -->
+    <div class="max-w-7xl mx-auto mb-8">
+        <div class="glass-effect rounded-3xl p-8 text-center glow-effect">
+            <div class="inline-block mb-4">
+                <div class="text-6xl icon-float">🎓</div>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-3">
+                Panel de Administración
+            </h1>
+            <p class="text-xl text-gray-300 font-light">
+                Plataforma de Gestión Santarcisio 2025
+            </p>
+            <div class="mt-6 flex items-center justify-center gap-2">
+                <div class="h-1 w-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                <div class="h-1 w-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"></div>
+                <div class="h-1 w-12 bg-gradient-to-r from-pink-500 to-indigo-500 rounded-full"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid de tarjetas -->
+    <div class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <!-- Sección Alumnos -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="grabaralumnos.html" class="block bg-gradient-to-br from-indigo-900/50 to-indigo-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🧑‍🎓</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
+                                Registrar Alumno
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Añadir un nuevo estudiante al sistema con toda su información
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-indigo-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="buscar_alumno.html" class="block bg-gradient-to-br from-blue-900/50 to-blue-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🔍</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-blue-300 transition-colors">
+                                Buscar Perfil Rápido
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Buscar por DNI o nombre y ver perfil completo del estudiante
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-blue-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="buscar_alumnos.html" class="block bg-gradient-to-br from-purple-900/50 to-purple-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">📝</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition-colors">
+                                Editar Alumnos por Salón
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Filtrar por grado y sección para modificar datos
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-purple-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Sección Padres -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="padres.html" class="block bg-gradient-to-br from-pink-900/50 to-pink-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">👨‍👩‍👧‍👦</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-pink-300 transition-colors">
+                                Buscar Padres
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Consultar y editar la información de los padres de familia
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-pink-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Sección Asistencia -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="asistencia.html" class="block bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">📊</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-cyan-300 transition-colors">
+                                Reporte de Asistencias
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Filtrar y consultar el historial de asistencias
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-cyan-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Sección Horarios -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="ver_horario.html" class="block bg-gradient-to-br from-teal-900/50 to-teal-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🗓️</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-teal-300 transition-colors">
+                                Ver Horarios por Salón
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Consultar la tabla de horarios de cualquier aula
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-teal-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="editar_horario.html" class="block bg-gradient-to-br from-emerald-900/50 to-emerald-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🛠️</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-emerald-300 transition-colors">
+                                Editar Horarios
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Crear o modificar el horario de un salón de clases
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Sección Eventos -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="eventos.html" class="block bg-gradient-to-br from-orange-900/50 to-orange-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">➕</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-orange-300 transition-colors">
+                                Añadir Evento
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Publicar un nuevo evento, noticia o anuncio importante
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-orange-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="eliminar-eventos.html" class="block bg-gradient-to-br from-red-900/50 to-red-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🗑️</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-red-300 transition-colors">
+                                Administrar Eventos
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Ver la lista de eventos y eliminar los antiguos
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-red-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Sección Pensiones -->
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="generadorpensiones.html" class="block bg-gradient-to-br from-violet-900/50 to-violet-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">🧾</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-violet-300 transition-colors">
+                                Generar Pensiones
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Crear los registros de pago mensual para un salón
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-violet-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="gestionpensiones.html" class="block bg-gradient-to-br from-fuchsia-900/50 to-fuchsia-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">💳</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-fuchsia-300 transition-colors">
+                                Gestionar Pensiones
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Ver y cambiar el estado de pago de los alumnos
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-fuchsia-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="registrar_pago.html" class="block bg-gradient-to-br from-green-900/50 to-green-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">💵</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-green-300 transition-colors">
+                                Registrar Pago
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Buscar alumno y registrar un pago de pensión
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-green-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-1 card-hover group">
+                <a href="reporte_pagos.html" class="block bg-gradient-to-br from-amber-900/50 to-amber-800/30 p-6 rounded-2xl h-full">
+                    <div class="flex items-start gap-4">
+                        <div class="text-5xl group-hover:scale-110 transition-transform duration-300">📈</div>
+                        <div class="flex-1">
+                            <h2 class="text-xl font-bold text-white mb-2 group-hover:text-amber-300 transition-colors">
+                                Reporte de Pagos
+                            </h2>
+                            <p class="text-gray-300 text-sm leading-relaxed">
+                                Ver el reporte de caja por día y exportar PDF
+                            </p>
+                            <div class="mt-4 flex items-center gap-2 text-amber-400 text-sm font-medium">
+                                <span>Acceder</span>
+                                <span class="group-hover:translate-x-1 transition-transform">→</span>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="max-w-7xl mx-auto mt-12">
+        <div class="glass-effect rounded-2xl p-6 text-center">
+            <p class="text-gray-400 text-sm">
+                © 2025 Santarcisio - Sistema de Gestión Educativa
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

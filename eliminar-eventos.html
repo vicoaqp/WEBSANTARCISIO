@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eliminar Eventos</title>
+    <style>
+        html {
+            color-scheme: dark;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 700px;
+            margin: auto;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        
+        /* 🎨 Estilos para la lista de eventos */
+        #eventListContainer {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .evento-card {
+            background: #2c2c2c;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .evento-info h3 {
+            margin: 0;
+            color: #fff;
+        }
+        .evento-info p {
+            margin: 5px 0 0;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        /* 🎨 Estilo para el botón de eliminar */
+        .delete-btn {
+            background-color: #d93025; /* Rojo de peligro */
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .delete-btn:hover {
+            background-color: #b0261d;
+        }
+        .delete-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        #message {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🗑️ Administrar y Eliminar Eventos</h1>
+        
+        <div id="message">Cargando eventos...</div>
+        
+        <div id="eventListContainer">
+            </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+    <script>
+        // 2. Tu configuración de Firebase (conservada como solicitaste)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        // 3. Inicializar Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        const eventosRef = db.collection("eventos");
+
+        // 4. Referencias al DOM
+        const eventListContainer = document.getElementById('eventListContainer');
+        const messageDiv = document.getElementById('message');
+
+        // --- FUNCIÓN PARA CARGAR LOS EVENTOS ---
+        async function cargarEventos() {
+            try {
+                // Consultar eventos, ordenados por fecha de creación (más nuevos primero)
+                const snapshot = await eventosRef.orderBy("fecha_creacion", "desc").get();
+
+                if (snapshot.empty) {
+                    messageDiv.textContent = 'No hay eventos para mostrar.';
+                    return;
+                }
+
+                messageDiv.textContent = ''; // Limpiar mensaje de "Cargando..."
+                
+                snapshot.forEach(doc => {
+                    const evento = doc.data();
+                    renderEvento(evento);
+                });
+
+            } catch (error) {
+                console.error("Error al cargar eventos: ", error);
+                messageDiv.textContent = `❌ Error al cargar: ${error.message}`;
+                messageDiv.className = 'error';
+            }
+        }
+
+        // --- FUNCIÓN PARA "PINTAR" UN EVENTO EN EL HTML ---
+        function renderEvento(evento) {
+            // Convertir Timestamp de Firestore a fecha legible
+            let fechaFormateada = 'Fecha no especificada';
+            if (evento.fecha && evento.fecha.toDate) {
+                fechaFormateada = evento.fecha.toDate().toLocaleString('es-ES', {
+                    dateStyle: 'long',
+                    timeStyle: 'short'
+                });
+            }
+
+            const card = document.createElement('div');
+            card.className = 'evento-card';
+            // Usamos el ID del documento como 'id' para el elemento HTML
+            card.id = evento.id; 
+
+            card.innerHTML = `
+                <div class="evento-info">
+                    <h3>${evento.titulo}</h3>
+                    <p>${fechaFormateada}</p>
+                </div>
+                <button class="delete-btn" data-id="${evento.id}" data-foto-url="${evento.foto || ''}">
+                    Eliminar
+                </button>
+            `;
+            eventListContainer.appendChild(card);
+        }
+
+        // --- FUNCIÓN PARA ELIMINAR UN EVENTO ---
+        async function eliminarEvento(docId, fotoUrl, buttonElement) {
+            // Confirmación de seguridad
+            if (!confirm('¿Estás seguro de que quieres eliminar este evento? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            buttonElement.textContent = 'Eliminando...';
+            buttonElement.disabled = true;
+
+            try {
+                // 1. Eliminar la foto de Storage (si existe)
+                if (fotoUrl) {
+                    try {
+                        // Obtenemos la referencia del archivo a partir de su URL de descarga
+                        const fileRef = storage.refFromURL(fotoUrl);
+                        await fileRef.delete();
+                        console.log("Foto eliminada de Storage:", fotoUrl);
+                    } catch (storageError) {
+                        // Si la foto no existe (ej. fue borrada manualm.), no detengas la eliminación del documento
+                        console.warn("No se pudo eliminar la foto (quizás ya no existía):", storageError.message);
+                    }
+                }
+
+                // 2. Eliminar el documento de Firestore
+                await eventosRef.doc(docId).delete();
+
+                // 3. Eliminar la tarjeta del evento del HTML
+                document.getElementById(docId).remove();
+                
+                console.log("Evento eliminado de Firestore:", docId);
+
+            } catch (error) {
+                console.error("Error al eliminar el evento:", error);
+                alert(`Error al eliminar: ${error.message}`);
+                // Volver a habilitar el botón si algo salió mal
+                buttonElement.textContent = 'Eliminar';
+                buttonElement.disabled = false;
+            }
+        }
+
+        // --- EVENT LISTENERS ---
+
+        // 1. Cargar todos los eventos cuando la página esté lista
+        window.addEventListener('DOMContentLoaded', cargarEventos);
+
+        // 2. Escuchar clics en la lista (usando delegación de eventos)
+        eventListContainer.addEventListener('click', (e) => {
+            // Verificar si el clic fue en un botón de eliminar
+            if (e.target.classList.contains('delete-btn')) {
+                const docId = e.target.dataset.id;
+                const fotoUrl = e.target.dataset.fotoUrl;
+                eliminarEvento(docId, fotoUrl, e.target);
+            }
+        });
+    </script>
+</body>
+</html>

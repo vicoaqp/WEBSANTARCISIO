@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabador de Alumnos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            /* 1. Fondo del body: cambiado a un gris oscuro */
+            background-color: #111827; /* Tailwind gray-900 */
+            /* 2. Color de texto base: cambiado a un gris claro */
+            color: #d1d5db; /* Tailwind gray-300 */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-6 md:p-10 rounded-xl shadow-2xl w-full max-w-lg space-y-6 transform transition-all duration-300">
+        
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center text-indigo-400 mb-2">Registro de Alumnos</h1>
+        <p class="text-center text-gray-400 mb-6">Completa los datos del nuevo estudiante.</p>
+
+        <form id="studentForm" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="nombres" class="block text-sm font-medium text-gray-300 mb-1">Nombres:</label>
+                    <input type="text" id="nombres" name="nombres" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+                </div>
+                <div>
+                    <label for="apellidos" class="block text-sm font-medium text-gray-300 mb-1">Apellidos:</label>
+                    <input type="text" id="apellidos" name="apellidos" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+                </div>
+            </div>
+
+            <div>
+                <label for="idEstudiante" class="block text-sm font-medium text-gray-300 mb-1">ID Estudiante:</label>
+                <input type="text" id="idEstudiante" name="idEstudiante" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="grado" class="block text-sm font-medium text-gray-300 mb-1">Grado:</label>
+                    <select id="grado" name="grado" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+                        <option value="" disabled selected>Selecciona un grado</option>
+                        <option value="1" class="text-black">1</option>
+                        <option value="2" class="text-black">2</option>
+                        <option value="3" class="text-black">3</option>
+                        <option value="4" class="text-black">4</option>
+                        <option value="5" class="text-black">5</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="seccion" class="block text-sm font-medium text-gray-300 mb-1">Sección:</label>
+                    <select id="seccion" name="seccion" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+                        <option value="" disabled selected>Selecciona una sección</option>
+                        <option value="A" class="text-black">A</option>
+                        <option value="B" class="text-black">B</option>
+                        <option value="C" class="text-black">C</option>
+                        <option value="D" class="text-black">D</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label for="direccion" class="block text-sm font-medium text-gray-300 mb-1">Dirección:</label>
+                <input type="text" id="direccion" name="direccion" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all" required>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="celular" class="block text-sm font-medium text-gray-300 mb-1">Celular:</label>
+                    <input type="tel" id="celular" name="celular" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                </div>
+                <div>
+                    <label for="dnipapa" class="block text-sm font-medium text-gray-300 mb-1">DNI del Padre:</label>
+                    <input type="text" id="dnipapa" name="dnipapa" class="w-full px-4 py-2 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 transition-all transform hover:scale-105">
+                Guardar Alumno
+            </button>
+        </form>
+        
+        <div id="messageBox" class="p-4 rounded-lg text-sm text-center font-medium mt-4 hidden"></div>
+    </div>
+
+    <script type="module">
+        // ====================================================================
+        // 1. IMPORTS de Firebase
+        // ====================================================================
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+        setLogLevel('debug');
+
+        // ====================================================================
+        // 2. CONFIGURACIÓN DE FIREBASE (¡TUS DATOS!)
+        // ====================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        let db; 
+
+        const messageBox = document.getElementById('messageBox');
+        
+        // 11. Función showMessage: Actualizada para modo oscuro
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            // Se quitan clases de modo claro Y modo oscuro para evitar conflictos
+            messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700', 'bg-green-800', 'text-green-200', 'bg-red-800', 'text-red-200');
+            
+            if (type === 'success') {
+                // Clases de éxito para modo oscuro
+                messageBox.classList.add('bg-green-800', 'text-green-200');
+            } else {
+                // Clases de error para modo oscuro
+                messageBox.classList.add('bg-red-800', 'text-red-200');
+            }
+        }
+
+        // Función de inicialización de Firebase
+        async function initFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                getAnalytics(app); 
+
+                document.getElementById('studentForm').addEventListener('submit', handleFormSubmit);
+                showMessage("Aplicación inicializada. ¡Lista para guardar datos!", "success");
+                console.log("✅ Firebase inicializado. Listo para guardar datos.");
+
+            } catch (error) {
+                console.error("Error al inicializar Firebase:", error);
+                showMessage("Error al inicializar la aplicación. Revisa la consola (F12) para más detalles.", "error");
+            }
+        }
+
+        // Función para manejar el envío del formulario
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            if (!db) {
+                showMessage("Error: La base de datos no está conectada. Intenta recargar la página.", "error");
+                return;
+            }
+
+            const form = event.target;
+            const studentData = {
+                nombres: form.nombres.value,
+                apellidos: form.apellidos.value,
+                idEstudiante: form.idEstudiante.value,
+                // ========== ¡AQUÍ ESTÁ EL CAMBIO! ==========
+                // Se quitó parseInt() para que se guarde como texto (ej: "1") y no como número (ej: 1)
+                grado: form.grado.value,
+                // ==========================================
+                seccion: form.seccion.value,
+                direccion: form.direccion.value,
+                celular: form.celular.value,
+                dnipapa: form.dnipapa.value,
+                fechaRegistro: new Date().toISOString()
+            };
+
+            try {
+                const docRef = await addDoc(collection(db, `students`), studentData);
+                showMessage(`Alumno grabado con éxito. ID de Documento: ${docRef.id}`, 'success');
+                form.reset(); // Limpiar el formulario
+            } catch (error) {
+                console.error("Error al guardar el alumno: ", error);
+                showMessage("Error al guardar el alumno: " + error.message + ". ¡Revisa las reglas de Firestore!", 'error');
+            }
+        }
+        
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agregar Nuevo Evento</title>
+    <style>
+        html {
+            color-scheme: dark;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+            color: #bbbbbb;
+        }
+        input[type="text"],
+        input[type="url"],
+        textarea,
+        input[type="datetime-local"],
+        /* 🎨 NUEVO: Estilo para el input de archivo */
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            background-color: #2c2c2c;
+            color: #f0f0f0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        /* 🎨 NUEVO: Estilo para el botón de "Examinar..." */
+        input[type="file"]::file-selector-button {
+            background-color: #333;
+            color: #e0e0e0;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #444;
+        }
+        textarea {
+            resize: vertical;
+            height: 100px;
+        }
+        button {
+            background-color: #2ea44f;
+            color: white;
+            padding: 12px 20px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #34c759;
+        }
+        #message {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>➕ Agregar Nuevo Evento a Firestore</h1>
+        <form id="eventForm">
+            <label for="titulo">Título del Evento:</label>
+            <input type="text" id="titulo" name="titulo" required>
+
+            <label for="descripcion">Descripción:</label>
+            <textarea id="descripcion" name="descripcion" required></textarea>
+
+            <label for="fecha">Fecha y Hora del Evento:</label>
+            <input type="datetime-local" id="fecha" name="fecha" required>
+
+            <label for="fotoInput">Subir Foto (Opcional):</label>
+            <input type="file" id="fotoInput" name="fotoInput" accept="image/*">
+
+            <button type="submit">Guardar Evento</button>
+        </form>
+        <div id="message"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+    <script>
+        // 2. Tu configuración de Firebase (conservada como solicitaste)
+        // 🔑 ¡Recuerda configurar tus Reglas de Seguridad en la consola de Firebase!
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        // 3. Inicializar Firebase, Firestore y Storage
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage(); // ➕ AÑADIDO: Inicializar Storage
+        const eventosRef = db.collection("eventos");
+
+        // 4. Lógica para manejar el formulario
+        const eventForm = document.getElementById('eventForm');
+        const messageDiv = document.getElementById('message');
+
+        function convertToFirestoreTimestamp(isoString) {
+            if (!isoString) return null;
+            const date = new Date(isoString);
+            return firebase.firestore.Timestamp.fromDate(date);
+        }
+
+        // 🎨 LÓGICA ACTUALIZADA para manejar la subida de archivos
+        eventForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            messageDiv.textContent = 'Guardando...';
+            messageDiv.className = '';
+
+            const formData = new FormData(eventForm);
+            const titulo = formData.get('titulo');
+            const descripcion = formData.get('descripcion');
+            const fechaISO = formData.get('fecha');
+
+            // ➕ NUEVO: Obtener el archivo del input
+            const fotoFile = document.getElementById('fotoInput').files[0];
+
+            // 1. Crear referencia de documento (para tener el ID antes de guardar)
+            const newDocRef = eventosRef.doc();
+            const docId = newDocRef.id;
+
+            let fotoUrl = ""; // Valor por defecto si no hay foto
+
+            try {
+                // 2. ➕ Lógica de subida de imagen (SI el usuario seleccionó un archivo)
+                if (fotoFile) {
+                    messageDiv.textContent = 'Subiendo imagen...';
+                    
+                    // Crear una referencia en Storage (ej: 'eventos/ID_DEL_EVENTO/nombre_archivo.jpg')
+                    // Esto mantiene las fotos organizadas por evento
+                    const filePath = `eventos/${docId}/${fotoFile.name}`;
+                    const fileRef = storage.ref(filePath);
+
+                    // Subir el archivo
+                    const snapshot = await fileRef.put(fotoFile);
+
+                    // Obtener la URL de descarga pública
+                    fotoUrl = await snapshot.ref.getDownloadURL();
+                    
+                    messageDiv.textContent = 'Imagen subida, guardando evento...';
+                }
+
+                // 3. Crear el objeto del evento
+                const eventData = {
+                    titulo: titulo,
+                    descripcion: descripcion,
+                    fecha: convertToFirestoreTimestamp(fechaISO),
+                    id: docId,
+                    foto: fotoUrl, // Usar la URL de descarga (o "" si no se subió nada)
+                    fecha_creacion: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                // 4. Guardar el documento en Firestore
+                await newDocRef.set(eventData);
+
+                messageDiv.textContent = `✅ Evento guardado con éxito! ID: ${docId}`;
+                messageDiv.className = 'success';
+                eventForm.reset(); // Limpiar el formulario
+
+            } catch (error) {
+                console.error("Error al guardar el evento: ", error);
+                messageDiv.textContent = `❌ Error al guardar: ${error.message}`;
+                messageDiv.className = 'error';
+            }
+        });
+    </script>
+</body>
+</html>

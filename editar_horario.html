@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Horarios Escolares</title>
+    <style>
+        /* Estilos Dark Mode (Basado en ver_horario.html) */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #0d1117; 
+            color: #f0f6fc; 
+            line-height: 1.6; 
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #161b22; 
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); 
+        }
+        h1, h2 {
+            color: #c9d1d9;
+            border-bottom: 2px solid #58a6ff; 
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: #58a6ff;
+            border-bottom: 1px dashed #484f58;
+            margin-top: 30px;
+        }
+
+        /* --- Filtros y Botones Principales --- */
+        .filtros {
+            display: flex;
+            align-items: flex-end;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            background-color: #0d1117;
+        }
+        .filtro-grupo {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #8b949e; 
+        }
+        select, input[type="text"], input[type="time"], input[type="number"] {
+            padding: 10px;
+            border: 1px solid #484f58; 
+            border-radius: 6px;
+            font-size: 16px;
+            background-color: #21262d; 
+            color: #f0f6fc;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #btn-cargar {
+            background-color: #238636; /* Verde */
+            color: white;
+        }
+        #btn-guardar {
+            background-color: #58a6ff; /* Azul */
+            color: #0d1117;
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            margin-top: 30px;
+        }
+        .btn-add {
+            background-color: #30363d;
+            color: #c9d1d9;
+            margin-top: 15px;
+        }
+        .btn-remove {
+            background-color: #b02a37; /* Rojo */
+            color: white;
+            font-size: 1.2em;
+            padding: 5px 10px;
+        }
+
+        /* --- Formulario del Horario --- */
+        #horario-form {
+            display: none; /* Oculto hasta cargar */
+        }
+        .dia-container {
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 20px;
+        }
+        /* Contenedor para una fila de curso */
+        .curso-input-group {
+            display: grid;
+            grid-template-columns: 3fr 1fr 1fr 1fr 50px; /* Curso | Inicio | Fin | Orden | Borrar */
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #1e2127;
+            border-radius: 4px;
+        }
+        .curso-input-group input {
+            width: 100%;
+            box-sizing: border-box; /* Para que el padding no rompa el layout */
+        }
+
+        /* --- Mensajes de Estado --- */
+        #mensajes p {
+            padding: 15px; margin-top: 15px; border-radius: 8px; font-weight: 500;
+            text-align: center; font-size: 1.1em;
+        }
+        .cargando { background-color: #21262d; color: #ffd700; }
+        .error { background-color: #6d0a1c; color: #ff7b72; }
+        .success { background-color: #1a4a24; color: #7ee28e; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🛠️ Editor de Horarios Escolares</h1>
+
+        <div class="filtros">
+            <div class="filtro-grupo">
+                <label for="grado-filtro">Grado</label>
+                <select id="grado-filtro">
+                    </select>
+            </div>
+            <div class="filtro-grupo">
+                <label for="seccion-filtro">Sección</label>
+                <select id="seccion-filtro">
+                    </select>
+            </div>
+            <button id="btn-cargar">Cargar Horario</button>
+        </div>
+
+        <div id="mensajes">
+            <p id="mensaje-estado" style="display: none;">Mensaje</p>
+        </div>
+        
+        <form id="horario-form">
+            <div class="dia-container" id="lunes-container">
+                <h2>Lunes</h2>
+                <div class="curso-input-group" style="font-weight: bold; background: none; padding: 0 10px 5px 10px;">
+                    <div>Curso</div>
+                    <div>Hora Inicio</div>
+                    <div>Hora Fin</div>
+                    <div>Orden</div>
+                    <div></div>
+                </div>
+                <div id="lunes-cursos"></div>
+                <button type="button" class="btn-add" data-dia="lunes">Añadir curso a Lunes</button>
+            </div>
+
+            <div class="dia-container" id="martes-container">
+                <h2>Martes</h2>
+                <div class="curso-input-group" style="font-weight: bold; background: none; padding: 0 10px 5px 10px;">
+                    <div>Curso</div>
+                    <div>Hora Inicio</div>
+                    <div>Hora Fin</div>
+                    <div>Orden</div>
+                    <div></div>
+                </div>
+                <div id="martes-cursos"></div>
+                <button type="button" class="btn-add" data-dia="martes">Añadir curso a Martes</button>
+            </div>
+            
+            <div class="dia-container" id="miercoles-container">
+                <h2>Miércoles</h2>
+                <div class="curso-input-group" style="font-weight: bold; background: none; padding: 0 10px 5px 10px;">
+                    <div>Curso</div>
+                    <div>Hora Inicio</div>
+                    <div>Hora Fin</div>
+                    <div>Orden</div>
+                    <div></div>
+                </div>
+                <div id="miercoles-cursos"></div>
+                <button type="button" class="btn-add" data-dia="miercoles">Añadir curso a Miércoles</button>
+            </div>
+
+            <div class="dia-container" id="jueves-container">
+                <h2>Jueves</h2>
+                <div class="curso-input-group" style="font-weight: bold; background: none; padding: 0 10px 5px 10px;">
+                    <div>Curso</div>
+                    <div>Hora Inicio</div>
+                    <div>Hora Fin</div>
+                    <div>Orden</div>
+                    <div></div>
+                </div>
+                <div id="jueves-cursos"></div>
+                <button type="button" class="btn-add" data-dia="jueves">Añadir curso a Jueves</button>
+            </div>
+
+            <div class="dia-container" id="viernes-container">
+                <h2>Viernes</h2>
+                <div class="curso-input-group" style="font-weight: bold; background: none; padding: 0 10px 5px 10px;">
+                    <div>Curso</div>
+                    <div>Hora Inicio</div>
+                    <div>Hora Fin</div>
+                    <div>Orden</div>
+                    <div></div>
+                </div>
+                <div id="viernes-cursos"></div>
+                <button type="button" class="btn-add" data-dia="viernes">Añadir curso a Viernes</button>
+            </div>
+
+            <button type="submit" id="btn-guardar">Guardar Cambios del Horario</button>
+        </form>
+
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Referencias al DOM
+        const gradoSelect = document.getElementById('grado-filtro');
+        const seccionSelect = document.getElementById('seccion-filtro');
+        const btnCargar = document.getElementById('btn-cargar');
+        const horarioForm = document.getElementById('horario-form');
+        const mensajeEstado = document.getElementById('mensaje-estado');
+        
+        const DIAS_SEMANA = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+
+        /**
+         * Inicializa los filtros
+         */
+        function init() {
+            const grados = ['1', '2', '3', '4', '5'];
+            const secciones = ['A', 'B', 'C', 'D'];
+
+            grados.forEach(g => {
+                gradoSelect.options.add(new Option(g + "°", g));
+            });
+            secciones.forEach(s => {
+                seccionSelect.options.add(new Option(s, s));
+            });
+
+            // Listeners
+            btnCargar.addEventListener('click', cargarHorario);
+            horarioForm.addEventListener('submit', guardarHorario);
+
+            // Listener para botones de añadir y eliminar (delegación de eventos)
+            horarioForm.addEventListener('click', function(e) {
+                // Si se hace clic en "Añadir curso..."
+                if (e.target.classList.contains('btn-add')) {
+                    const dia = e.target.dataset.dia;
+                    crearInputsDeCurso(dia, {}); // Añade fila vacía
+                }
+                // Si se hace clic en "X" (eliminar)
+                if (e.target.classList.contains('btn-remove')) {
+                    e.target.closest('.curso-input-group').remove(); // Elimina la fila
+                }
+            });
+        }
+
+        /**
+         * Muestra un mensaje de estado
+         */
+        function mostrarMensaje(tipo, texto) {
+            mensajeEstado.textContent = texto;
+            mensajeEstado.className = tipo;
+            mensajeEstado.style.display = 'block';
+        }
+
+        /**
+         * Carga el horario existente desde Firestore
+         */
+        async function cargarHorario() {
+            const grado = gradoSelect.value;
+            const seccion = seccionSelect.value;
+            const docId = grado + seccion;
+
+            mostrarMensaje('cargando', 'Cargando horario...');
+            
+            try {
+                const docRef = db.collection("horarios_por_grado").doc(docId);
+                const docSnap = await docRef.get();
+
+                // Limpiar todos los contenedores de cursos
+                DIAS_SEMANA.forEach(dia => {
+                    document.getElementById(`${dia}-cursos`).innerHTML = '';
+                });
+
+                if (docSnap.exists) {
+                    const horarioData = docSnap.data();
+                    
+                    DIAS_SEMANA.forEach(dia => {
+                        if (horarioData[dia] && Array.isArray(horarioData[dia])) {
+                            // Ordenar por 'orden' antes de pintar
+                            const diaOrdenado = horarioData[dia].sort((a, b) => parseInt(a.orden) - parseInt(b.orden));
+                            
+                            diaOrdenado.forEach(curso => {
+                                crearInputsDeCurso(dia, curso);
+                            });
+                        }
+                    });
+                    mostrarMensaje('success', `Horario de ${grado}°${seccion} cargado. Listo para editar.`);
+                } else {
+                    mostrarMensaje('cargando', `No existe horario para ${grado}°${seccion}. Puedes crear uno nuevo.`);
+                }
+                
+                horarioForm.style.display = 'block'; // Mostrar el formulario
+
+            } catch (error) {
+                console.error("Error al cargar horario:", error);
+                mostrarMensaje('error', 'Error al conectar con la base de datos.');
+                horarioForm.style.display = 'none';
+            }
+        }
+
+        /**
+         * Crea una fila de inputs para un curso
+         */
+        function crearInputsDeCurso(dia, cursoData) {
+            const container = document.getElementById(`${dia}-cursos`);
+            const div = document.createElement('div');
+            div.className = 'curso-input-group';
+
+            div.innerHTML = `
+                <input type="text" class="input-curso" placeholder="Nombre del Curso" value="${cursoData.curso || ''}">
+                <input type="time" class="input-hora-inicio" value="${cursoData.hora_inicio || '08:00'}">
+                <input type="time" class="input-hora-fin" value="${cursoData.hora_fin || '09:00'}">
+                <input type="number" class="input-orden" placeholder="Orden" min="1" value="${cursoData.orden || 1}">
+                <button type="button" class="btn-remove">X</button>
+            `;
+            container.appendChild(div);
+        }
+
+        /**
+         * Guarda el horario completo en Firestore
+         */
+        async function guardarHorario(e) {
+            e.preventDefault();
+            const grado = gradoSelect.value;
+            const seccion = seccionSelect.value;
+            const docId = grado + seccion;
+
+            mostrarMensaje('cargando', 'Guardando horario...');
+            
+            const dataToSave = {};
+
+            try {
+                // Recorrer cada día
+                DIAS_SEMANA.forEach(dia => {
+                    const diaContainer = document.getElementById(`${dia}-cursos`);
+                    const cursoFilas = diaContainer.querySelectorAll('.curso-input-group');
+                    
+                    const arrayDia = []; // Array para los cursos de este día
+                    
+                    cursoFilas.forEach(fila => {
+                        const curso = fila.querySelector('.input-curso').value.trim();
+                        const hora_inicio = fila.querySelector('.input-hora-inicio').value;
+                        const hora_fin = fila.querySelector('.input-hora-fin').value;
+                        // Guardar 'orden' siempre como número
+                        const orden = parseInt(fila.querySelector('.input-orden').value, 10);
+                        
+                        // Solo añadir si el nombre del curso no está vacío
+                        if (curso) {
+                            arrayDia.push({
+                                curso: curso,
+                                hora_inicio: hora_inicio,
+                                hora_fin: hora_fin,
+                                orden: orden || 1 // Asegurar que 'orden' sea un número
+                            });
+                        }
+                    });
+                    
+                    // Asignar el array de cursos al día correspondiente
+                    dataToSave[dia] = arrayDia;
+                });
+
+                // Usar .set() para sobrescribir completamente el documento
+                await db.collection("horarios_por_grado").doc(docId).set(dataToSave);
+
+                mostrarMensaje('success', `¡Horario para ${grado}°${seccion} guardado con éxito!`);
+
+            } catch (error) {
+                console.error("Error al guardar horario:", error);
+                mostrarMensaje('error', 'Error al guardar en la base de datos.');
+            }
+        }
+
+        // Cargar todo al iniciar
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+
+</body>
+</html>

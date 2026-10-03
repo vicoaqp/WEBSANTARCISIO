@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscar Alumno</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Tailwind gray-900 */
+            color: #d1d5db; /* Tailwind gray-300 */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 p-6 md:p-10 rounded-xl shadow-2xl w-full max-w-5xl space-y-6">
+        
+        <h1 class="text-3xl md:text-4xl font-extrabold text-center text-indigo-400 mb-6">🔍 Buscar Perfil de Alumno</h1>
+
+        <form id="searchForm" class="flex flex-col md:flex-row gap-4">
+            <label for="search-input" class="sr-only">DNI, Nombre o Apellido:</label>
+            <input 
+                type="text" 
+                id="search-input" 
+                placeholder="Ingresa DNI, Nombre o Apellido del Alumno" 
+                class="w-full px-4 py-3 border bg-gray-700 border-gray-600 text-gray-100 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg" 
+                required
+            >
+            <button 
+                type="submit" 
+                id="search-button"
+                class="w-full md:w-auto bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50 transition-all text-lg"
+            >
+                Buscar
+            </button>
+        </form>
+        
+        <div id="message-box" class="p-4 rounded-lg text-sm text-center font-medium mt-4 hidden"></div>
+
+        <div id="search-results-container" class="mt-6" style="display: none;">
+            <h3 class="text-xl font-semibold text-gray-200 mb-3">Resultados de la Búsqueda:</h3>
+            <div id="search-results-list" class="flex flex-col gap-3 max-h-72 overflow-y-auto pr-2">
+                </div>
+        </div>
+
+        <div id="results-container" class="mt-8 space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-6" style="display: none;">
+            
+            <div class="bg-gray-700 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold text-indigo-400 mb-4 border-b border-gray-600 pb-2">🧑‍🎓 Datos del Alumno</h2>
+                
+                <p class="mb-3">
+                    <span class="text-sm text-gray-400 block">Nombre Completo:</span>
+                    <span id="student-name" class="text-lg text-gray-100 font-medium">---</span>
+                </p>
+                <p class="mb-3">
+                    <span class="text-sm text-gray-400 block">DNI (idEstudiante):</span>
+                    <span id="student-dni" class="text-lg text-gray-100 font-medium">---</span>
+                </p>
+                <p class="mb-3">
+                    <span class="text-sm text-gray-400 block">Grado y Sección:</span>
+                    <span id="student-grade" class="text-lg text-gray-100 font-medium">---</span>
+                </p>
+                <p class="mb-3">
+                    <span class="text-sm text-gray-400 block">Celular:</span>
+                    <span id="student-phone" class="text-lg text-gray-100 font-medium">---</span>
+                </p>
+                <p class="mb-3">
+                    <span class="text-sm text-gray-400 block">Dirección:</span>
+                    <span id="student-address" class="text-lg text-gray-100 font-medium">---</span>
+                </p>
+            </div>
+
+            <div class="bg-gray-700 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold text-indigo-400 mb-4 border-b border-gray-600 pb-2">👨‍👩‍👧 Datos del Apoderado</h2>
+                
+                <div id="parent-details">
+                    <p class="mb-3">
+                        <span class="text-sm text-gray-400 block">Nombre Completo:</span>
+                        <span id="parent-name" class="text-lg text-gray-100 font-medium">---</span>
+                    </p>
+                    <p class="mb-3">
+                        <span class="text-sm text-gray-400 block">DNI Apoderado:</span>
+                        <span id="parent-dni" class="text-lg text-gray-100 font-medium">---</span>
+                    </p>
+                    <p class="mb-3">
+                        <span class="text-sm text-gray-400 block">Celular:</span>
+                        <span id="parent-phone" class="text-lg text-gray-100 font-medium">---</span>
+                    </p>
+                    <p class="mb-3">
+                        <span class="text-sm text-gray-400 block">Correo:</span>
+                        <span id="parent-email" class="text-lg text-gray-100 font-medium">---</span>
+                    </p>
+                    <p class="mb-3">
+                        <span class="text-sm text-gray-400 block">Dirección:</span>
+                        <span id="parent-address" class="text-lg text-gray-100 font-medium">---</span>
+                    </p>
+                </div>
+                
+                <div id="parent-no-data" class="text-gray-400 italic" style="display: none;">---</div>
+                
+                <a 
+                    id="edit-parent-button"
+                    href="#" 
+                    style="display: none;"
+                    class="inline-block mt-4 bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-all"
+                >
+                    Editar Datos del Apoderado
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDOFAPB7LKSgJ0zYhiE5XANU8I0-68I08k",
+            authDomain: "santarcisio2025.firebaseapp.com",
+            projectId: "santarcisio2025",
+            storageBucket: "santarcisio2025.firebasestorage.app",
+            messagingSenderId: "785603745166",
+            appId: "1:785603745166:web:b689ab60c7fd55968c80df",
+            measurementId: "G-SHMGZLDNXB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        getAnalytics(app);
+
+        // Referencias al DOM
+        const searchForm = document.getElementById('searchForm');
+        const searchInput = document.getElementById('search-input'); // 🎨 CAMBIO: Nombre de ID
+        const messageBox = document.getElementById('message-box');
+        
+        // Contenedores de resultados
+        const searchResultsContainer = document.getElementById('search-results-container');
+        const searchResultsList = document.getElementById('search-results-list');
+        const resultsContainer = document.getElementById('results-container');
+        
+        // Spans del Alumno
+        const studentName = document.getElementById('student-name');
+        const studentDni = document.getElementById('student-dni');
+        const studentGrade = document.getElementById('student-grade');
+        const studentPhone = document.getElementById('student-phone');
+        const studentAddress = document.getElementById('student-address');
+
+        // Spans del Padre
+        const parentDetails = document.getElementById('parent-details');
+        const parentNoData = document.getElementById('parent-no-data');
+        const parentName = document.getElementById('parent-name');
+        const parentDni = document.getElementById('parent-dni');
+        const parentPhone = document.getElementById('parent-phone');
+        const parentEmail = document.getElementById('parent-email');
+        const parentAddress = document.getElementById('parent-address');
+        const editParentButton = document.getElementById('edit-parent-button');
+
+
+        /**
+         * Muestra un mensaje en la caja de mensajes.
+         */
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden', 'bg-red-800', 'text-red-200', 'bg-green-800', 'text-green-200', 'bg-yellow-800', 'text-yellow-200');
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-800', 'text-green-200');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-800', 'text-red-200');
+            } else { // 'loading'
+                messageBox.classList.add('bg-yellow-800', 'text-yellow-200');
+            }
+        }
+
+        /**
+         * Resetea la tarjeta del apoderado a su estado inicial.
+         */
+        function resetParentCard() {
+            parentDetails.style.display = 'none';
+            parentNoData.style.display = 'block';
+            parentNoData.textContent = '---';
+            editParentButton.style.display = 'none';
+        }
+
+        /**
+         * 🎨 NUEVO: Maneja el envío del formulario de búsqueda.
+         * Busca por DNI, Nombre y Apellido y muestra una lista.
+         */
+        async function handleSearchSubmit(event) {
+            event.preventDefault();
+            const searchTerm = searchInput.value.trim();
+
+            if (!searchTerm) {
+                showMessage("Por favor, ingresa un término de búsqueda.", 'error');
+                return;
+            }
+
+            showMessage("Buscando...", 'loading');
+            resultsContainer.style.display = 'none'; // Ocultar perfil detallado
+            searchResultsContainer.style.display = 'none'; // Ocultar lista previa
+            searchResultsList.innerHTML = ''; // Limpiar lista previa
+
+            const studentsMap = new Map();
+
+            try {
+                // 1. Buscar por DNI (idEstudiante)
+                const qDNI = query(collection(db, "students"), where("idEstudiante", "==", searchTerm), limit(5));
+                const snapDNI = await getDocs(qDNI);
+                snapDNI.forEach(doc => {
+                    studentsMap.set(doc.data().idEstudiante, doc.data());
+                });
+
+                // 2. Si no es un DNI, buscar por Nombre y Apellido (tipo "empieza con")
+                // Capitalizamos la primera letra para que coincida (Ej: "juan" -> "Juan")
+                const capTerm = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
+                
+                // Query por Nombres
+                const qNombres = query(collection(db, "students"), 
+                    where("nombres", ">=", capTerm), 
+                    where("nombres", "<=", capTerm + '\uf8ff'),
+                    limit(10)
+                );
+                // Query por Apellidos
+                const qApellidos = query(collection(db, "students"), 
+                    where("apellidos", ">=", capTerm), 
+                    where("apellidos", "<=", capTerm + '\uf8ff'),
+                    limit(10)
+                );
+
+                const [snapNombres, snapApellidos] = await Promise.all([
+                    getDocs(qNombres),
+                    getDocs(qApellidos)
+                ]);
+
+                snapNombres.forEach(doc => {
+                    studentsMap.set(doc.data().idEstudiante, doc.data());
+                });
+                snapApellidos.forEach(doc => {
+                    studentsMap.set(doc.data().idEstudiante, doc.data());
+                });
+
+                // 3. Mostrar los resultados en la lista previa
+                const results = Array.from(studentsMap.values());
+                displaySearchResults(results);
+
+            } catch (error) {
+                console.error("Error al buscar:", error);
+                showMessage(`Error al conectar con la base de datos: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * 🎨 NUEVO: Muestra los resultados de la búsqueda en la "Lista Previa".
+         */
+        function displaySearchResults(results) {
+            if (results.length === 0) {
+                showMessage("No se encontraron alumnos que coincidan con la búsqueda.", 'error');
+                return;
+            }
+
+            // Si solo hay 1 resultado, mostrar su perfil directamente
+            if (results.length === 1) {
+                messageBox.classList.add('hidden'); // Ocultar mensaje de "Buscando..."
+                fetchStudentProfile(results[0].idEstudiante);
+                return;
+            }
+
+            // Si hay más de 1 resultado, mostrar la lista
+            messageBox.classList.add('hidden');
+            
+            results.forEach(student => {
+                const button = document.createElement('button');
+                button.type = "button";
+                button.className = "w-full text-left p-4 bg-gray-700 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all";
+                
+                // Guardamos el DNI en el botón
+                button.setAttribute('data-dni', student.idEstudiante);
+                
+                button.innerHTML = `
+                    <p class="font-semibold text-lg text-white">${student.nombres} ${student.apellidos}</p>
+                    <p class="text-sm text-gray-400">DNI: ${student.idEstudiante} | Grado: ${student.grado}° "${student.seccion}"</p>
+                `;
+                
+                // Al hacer clic, se carga el perfil detallado
+                button.addEventListener('click', () => {
+                    fetchStudentProfile(student.idEstudiante);
+                });
+                
+                searchResultsList.appendChild(button);
+            });
+
+            searchResultsContainer.style.display = 'block';
+        }
+
+        /**
+         * 🎨 MODIFICADO: Esta función ahora se llama *después* de seleccionar
+         * un alumno de la lista. Busca el perfil detallado.
+         */
+        async function fetchStudentProfile(dni) {
+            // Ocultar la lista de búsqueda y mensajes
+            searchResultsContainer.style.display = 'none';
+            messageBox.classList.add('hidden');
+            
+            // Mostrar el contenedor del perfil y resetear al padre
+            resultsContainer.style.display = 'grid';
+            resetParentCard();
+
+            try {
+                // --- 1. Buscar al Alumno (ya sabemos que existe) ---
+                const qStudent = query(collection(db, "students"), where("idEstudiante", "==", dni), limit(1));
+                const studentSnap = await getDocs(qStudent);
+
+                if (studentSnap.empty) {
+                    showMessage(`Error: No se pudo cargar el perfil del DNI: ${dni}`, 'error');
+                    resultsContainer.style.display = 'none';
+                    return;
+                }
+
+                // --- 2. Mostrar Datos del Alumno ---
+                const studentData = studentSnap.docs[0].data();
+                studentName.textContent = `${studentData.nombres || ''} ${studentData.apellidos || ''}`;
+                studentDni.textContent = studentData.idEstudiante;
+                studentGrade.textContent = `${studentData.grado || 'N/A'} "${studentData.seccion || 'N/A'}"`;
+                studentPhone.textContent = studentData.celular || 'No registrado';
+                studentAddress.textContent = studentData.direccion || 'No registrada';
+
+                const parentDniValue = studentData.dnipapa;
+
+                // --- 3. Buscar al Padre ---
+                if (!parentDniValue) {
+                    parentNoData.textContent = 'Este alumno no tiene un apoderado asociado.';
+                    return;
+                }
+                
+                const qParent = query(collection(db, "usuario"), where("dni", "==", parentDniValue), limit(1));
+                const parentSnap = await getDocs(qParent);
+
+                if (parentSnap.empty) {
+                    parentNoData.textContent = `Apoderado con DNI ${parentDniValue} no encontrado en la base de datos 'usuario'.`;
+                    return;
+                }
+
+                // --- 4. Mostrar Datos del Padre ---
+                const parentData = parentSnap.docs[0].data();
+                parentName.textContent = `${parentData.nombres || ''} ${parentData.apellidos || ''}`;
+                parentDni.textContent = parentData.dni;
+                parentPhone.textContent = parentData.celular || 'No registrado';
+                parentEmail.textContent = parentData.correo || 'No registrado';
+                parentAddress.textContent = parentData.direccion || 'No registrada';
+                
+                editParentButton.href = `editar_usuario.html?dni=${parentData.dni}`;
+                editParentButton.style.display = 'inline-block';
+                
+                parentDetails.style.display = 'block';
+                parentNoData.style.display = 'none';
+
+            } catch (error) {
+                console.error("Error al cargar el perfil:", error);
+                showMessage(`Error al cargar el perfil: ${error.message}`, 'error');
+                resultsContainer.style.display = 'none';
+            }
+        }
+
+        // Asignar el nuevo evento al formulario
+        searchForm.addEventListener('submit', handleSearchSubmit);
+    </script>
+</body>
+</html>
